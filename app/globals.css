@@ -1,26 +1,106 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes fall {
+  0% {
+    transform: translateY(-100px) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.5;
+  }
+  90% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(-30px) translateX(20px);
+    opacity: 0.7;
+  }
+}
+
+@keyframes drift {
+  0% {
+    transform: translateX(0px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.5;
+  }
+  90% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(100vw);
+    opacity: 0;
+  }
+}
+
+@keyframes chaos {
+  0% {
+    transform: translate(0, -100px) rotate(0deg) scale(1);
+    opacity: 0;
+  }
+  25% {
+    transform: translate(30px, 25vh) rotate(90deg) scale(1.2);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-20px, 50vh) rotate(180deg) scale(0.8);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(40px, 75vh) rotate(270deg) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, 100vh) rotate(360deg) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes spiral {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(100px, 50vh) rotate(720deg) scale(1.5);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(200px, 100vh) rotate(1440deg) scale(0.5);
+    opacity: 0;
+  }
+}
+
+.animate-fall {
+  animation: fall infinite ease-in;
+}
+
+.animate-float {
+  animation: float infinite ease-in-out;
+}
+
+.animate-drift {
+  animation: drift infinite linear;
+}
+
+.animate-chaos {
+  animation: chaos infinite ease-in-out;
+}
+
+.animate-spiral {
+  animation: spiral infinite ease-in-out;
 }

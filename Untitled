@@ -1,0 +1,6 @@
+// Add timestamp
+    analysis.updatedAt = new Date().toISOString();
+
+    return analysis;
+  }
+}
