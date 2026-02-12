@@ -1,40 +1,40 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+import { Redis } from '@upstash/redis';
 
-const CACHE_FILE = path.join(process.cwd(), 'weather-cache.json');
+const redis = Redis.fromEnv();
+
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function GET() {
   try {
     // Check if cached data exists and is fresh
     const cachedData = await getCachedData();
-
+    
     if (cachedData && isFresh(cachedData.timestamp)) {
       // Return cached data (no API call!)
       return Response.json(cachedData.weather);
     }
-
+    
     // Cache is stale or doesn't exist - fetch new data
     const freshWeather = await fetchAndAnalyze();
-
+    
     // Save to cache
     await saveCacheData({
       weather: freshWeather,
       timestamp: Date.now()
     });
-
+    
     return Response.json(freshWeather);
-
+    
   } catch (error) {
     console.error('Error:', error);
-
+    
     // If error, try returning stale cache as fallback
     const cachedData = await getCachedData();
     if (cachedData) {
       return Response.json(cachedData.weather);
     }
-
-    return Response.json({
+    
+    return Response.json({ 
       error: 'Failed to fetch weather',
       primaryMood: 'Unknown',
       weatherEmoji: '❓',
@@ -48,15 +48,20 @@ export async function GET() {
 
 async function getCachedData() {
   try {
-    const data = await fs.readFile(CACHE_FILE, 'utf-8');
-    return JSON.parse(data);
+    const data = await redis.get('weather-data');
+    return data;
   } catch (error) {
+    console.error('Redis get error:', error);
     return null;
   }
 }
 
 async function saveCacheData(data) {
-  await fs.writeFile(CACHE_FILE, JSON.stringify(data), 'utf-8');
+  try {
+    await redis.set('weather-data', data);
+  } catch (error) {
+    console.error('Redis set error:', error);
+  }
 }
 
 function isFresh(timestamp) {
@@ -83,7 +88,6 @@ async function fetchAndAnalyze() {
     // Combine and deduplicate
     const allPosts = [...(hotPosts.posts || hotPosts || []), ...(newPosts.posts || newPosts || [])];
 
-    console.log('📊 First post sample:', JSON.stringify(allPosts[0], null, 2));
     console.log('📊 Total posts fetched:', allPosts.length);
 
     const uniquePosts = Array.from(new Map(allPosts.map(p => [p.id, p])).values());
@@ -209,13 +213,6 @@ async function fetchAndAnalyze() {
         (content.match(/doubt|skeptical|unsure|questionable|really\?|hmm|suspicious/g) || []).length * 10;
     });
 
-    console.log('🔍 Agent scores sample:', Object.entries(agentScores).slice(0, 3).map(([name, scores]) => ({
-      name,
-      optimism: scores.optimismScore,
-      stress: scores.stressScore,
-      confusion: scores.confusionScore
-    })));
-
     // Get top for optimism and stress (always included)
     const sortedByOptimism = Object.entries(agentScores).sort((a, b) => b[1].optimismScore - a[1].optimismScore);
     const sortedByStress = Object.entries(agentScores).sort((a, b) => b[1].stressScore - a[1].stressScore);
@@ -306,10 +303,6 @@ async function fetchAndAnalyze() {
 }
 
 async function analyzeWithClaude(posts) {
-  // Combine all post texts
-  const postTexts = posts.data.map(p => p.content).join('\n---\n');
-
-  // Call Claude API
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
