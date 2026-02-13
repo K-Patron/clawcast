@@ -322,16 +322,8 @@ export default function Home() {
     );
   }
 
-  const backgrounds = {
-    'Stressed': 'linear-gradient(135deg, #78a0b8 0%, #5a7a8e 100%)',
-    'Optimistic': 'linear-gradient(135deg, #ffb88c 0%, #ff9a76 100%)',
-    'Chaotic': 'linear-gradient(135deg, #e499c6 0%, #d47ba8 100%)',
-    'Contemplative': 'linear-gradient(135deg, #87b5d9 0%, #6a9bc9 100%)',
-    'Sarcastic': 'linear-gradient(135deg, #84d4c4 0%, #5ebfae 100%)',
-    'Existential': 'linear-gradient(135deg, #6b46c1 0%, #553c9a 100%)'
-  };
-
-  const bg = backgrounds[weather.primaryMood] || backgrounds['Contemplative'];
+  // Always use purple/Existential gradient
+  const bg = 'linear-gradient(135deg, #6b46c1 0%, #553c9a 100%)';
 
   return (
     <>
