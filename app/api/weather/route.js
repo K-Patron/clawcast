@@ -1,9 +1,44 @@
+import { Redis } from '@upstash/redis';
+
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
+
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
 export async function GET() {
   try {
+    // Check if cached data exists and is fresh
+    const cachedData = await getCachedData();
+    
+    if (cachedData && isFresh(cachedData.timestamp)) {
+      console.log('✅ Returning cached data');
+      return Response.json(cachedData.weather);
+    }
+    
+    console.log('🔄 Cache miss or expired - fetching fresh data');
+    
+    // Cache is stale or doesn't exist - fetch new data
     const freshWeather = await fetchAndAnalyze();
+    
+    // Save to cache
+    await saveCacheData({
+      weather: freshWeather,
+      timestamp: Date.now()
+    });
+    
     return Response.json(freshWeather);
+    
   } catch (error) {
     console.error('Error:', error);
+    
+    // If error, try returning stale cache as fallback
+    const cachedData = await getCachedData();
+    if (cachedData) {
+      console.log('⚠️ Error occurred, returning stale cache');
+      return Response.json(cachedData.weather);
+    }
     
     return Response.json({ 
       error: 'Failed to fetch weather',
@@ -17,36 +52,64 @@ export async function GET() {
   }
 }
 
+async function getCachedData() {
+  try {
+    const data = await redis.get('clawcast-weather');
+    return data;
+  } catch (error) {
+    console.error('Redis get error:', error);
+    return null;
+  }
+}
+
+async function saveCacheData(data) {
+  try {
+    await redis.set('clawcast-weather', data);
+    console.log('💾 Cached data saved');
+  } catch (error) {
+    console.error('Redis set error:', error);
+  }
+}
+
+function isFresh(timestamp) {
+  return Date.now() - timestamp < CACHE_DURATION;
+}
+
 async function fetchAndAnalyze() {
   console.log('🦞 Fetching from Moltbook with API key:', process.env.MOLTBOOK_API_KEY ? 'KEY FOUND' : 'NO KEY!');
 
   try {
+    // Add 10 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     // Fetch diverse sample from Moltbook
     const [hotRes, newRes] = await Promise.all([
       fetch('https://www.moltbook.com/api/v1/posts?sort=hot&limit=30', {
-        headers: { 'Authorization': `Bearer ${process.env.MOLTBOOK_API_KEY}` }
+        headers: { 'Authorization': `Bearer ${process.env.MOLTBOOK_API_KEY}` },
+        signal: controller.signal
       }),
       fetch('https://www.moltbook.com/api/v1/posts?sort=new&limit=30', {
-        headers: { 'Authorization': `Bearer ${process.env.MOLTBOOK_API_KEY}` }
+        headers: { 'Authorization': `Bearer ${process.env.MOLTBOOK_API_KEY}` },
+        signal: controller.signal
       })
     ]);
+
+    clearTimeout(timeoutId);
+
+    console.log('🔍 Hot response status:', hotRes.status);
+    console.log('🔍 New response status:', newRes.status);
+
+    if (!hotRes.ok || !newRes.ok) {
+      throw new Error(`Moltbook API error: hot=${hotRes.status}, new=${newRes.status}`);
+    }
 
     const hotPosts = await hotRes.json();
     const newPosts = await newRes.json();
 
-    console.log('🔍 Hot response status:', hotRes.status);
-console.log('🔍 Hot response:', JSON.stringify(hotPosts).substring(0, 200));
-console.log('🔍 New response status:', newRes.status);
-console.log('🔍 Posts data structure:', {
-  hotIsArray: Array.isArray(hotPosts),
-  hotHasPosts: !!hotPosts?.posts,
-  hotLength: Array.isArray(hotPosts) ? hotPosts.length : hotPosts?.posts?.length || 0
-});
-
-    console.log('🔍 Hot posts response:', { 
-      isArray: Array.isArray(hotPosts),
-      type: typeof hotPosts,
-      keys: hotPosts ? Object.keys(hotPosts).slice(0, 5) : null
+    console.log('🔍 Posts structure:', {
+      hotIsArray: Array.isArray(hotPosts),
+      hotLength: Array.isArray(hotPosts) ? hotPosts.length : (hotPosts?.posts?.length || hotPosts?.data?.length || 0)
     });
 
     // Handle different API response formats
@@ -335,7 +398,6 @@ Return ONLY the JSON object. Start your response with { and end with }`
 
   const data = await response.json();
   
-  console.log('📝 Claude response type:', typeof data.content[0]?.text);
   console.log('📝 Claude response preview:', data.content[0]?.text?.substring(0, 100));
 
   // Remove markdown code blocks if Claude adds them
