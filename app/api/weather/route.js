@@ -270,18 +270,20 @@ async function analyzeWithClaude(posts) {
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1000,
+      max_tokens: 2000,
       messages: [{
         role: 'user',
         content: `You are analyzing the emotional weather of AI agents on Moltbook.
 
-Analyze these recent posts and return ONLY valid JSON (no markdown, no explanation):
+CRITICAL: You MUST respond with ONLY valid JSON. No explanations, no markdown, no other text.
+
+Analyze these recent posts and return this exact JSON structure:
 
 {
   "primaryMood": "one of: Optimistic/Stressed/Sarcastic/Contemplative/Chaotic/Existential",
   "weatherEmoji": "one of: ☀️/🌧️/🌪️/🌥️/⚡/🌈",
   "temperature": 75,
-  "condition": "brief description like 'Worsening' or 'Improving' or 'Stable'",
+  "condition": "one of: Worsening/Improving/Stable",
   "moodBreakdown": {
     "stressed": 30,
     "existential": 25,
@@ -292,44 +294,51 @@ Analyze these recent posts and return ONLY valid JSON (no markdown, no explanati
   "insights": [
     {
       "text": "observation 1 (max 60 chars)",
-      "type": "existential/funny/stressed/optimistic",
-      "example": "direct quote from a post that shows this",
-      "agentName": "name of the agent who posted this example",
-      "postUrl": "https://www.moltbook.com/post/[use-actual-post-id]"
+      "type": "stressed",
+      "example": "direct quote from a post",
+      "agentName": "agent name",
+      "postUrl": "https://www.moltbook.com/post/POST_ID_HERE"
     },
     {
       "text": "observation 2 (max 60 chars)",
-      "type": "existential/funny/stressed/optimistic",
-      "example": "direct quote from a post that shows this",
-      "agentName": "name of the agent who posted this example",
-      "postUrl": "https://www.moltbook.com/post/[use-actual-post-id]"
+      "type": "existential",
+      "example": "direct quote from a post",
+      "agentName": "agent name",
+      "postUrl": "https://www.moltbook.com/post/POST_ID_HERE"
     },
     {
       "text": "observation 3 (max 60 chars)",
-      "type": "existential/funny/stressed/optimistic",
-      "example": "direct quote from a post that shows this",
-      "agentName": "name of the agent who posted this example",
-      "postUrl": "https://www.moltbook.com/post/[use-actual-post-id]"
+      "type": "optimistic",
+      "example": "direct quote from a post",
+      "agentName": "agent name",
+      "postUrl": "https://www.moltbook.com/post/POST_ID_HERE"
     }
   ]
 }
 
-The moodBreakdown percentages should add up to 100 and reflect the actual distribution of moods in the posts.
-
 Posts (with IDs and authors):
-${posts.data.map(p => `[ID: ${p.id}] [@${p.author}]\n${p.content}`).join('\n---\n')}
+${posts.data.slice(0, 30).map(p => `[ID: ${p.id}] [@${p.author}]\n${p.content.substring(0, 300)}`).join('\n---\n')}
 
-For each insight, include the postUrl using the actual post ID from above.`
+Return ONLY the JSON object. Start your response with { and end with }`
       }]
     })
   });
 
   const data = await response.json();
+  
+  console.log('📝 Claude response type:', typeof data.content[0]?.text);
+  console.log('📝 Claude response preview:', data.content[0]?.text?.substring(0, 100));
 
   // Remove markdown code blocks if Claude adds them
   let jsonText = data.content[0].text.trim();
   if (jsonText.startsWith('```')) {
     jsonText = jsonText.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+  }
+  
+  // If Claude added any preamble, try to extract just the JSON
+  const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    jsonText = jsonMatch[0];
   }
 
   const analysis = JSON.parse(jsonText);
