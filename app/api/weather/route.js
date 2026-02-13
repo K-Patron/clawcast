@@ -34,6 +34,15 @@ async function fetchAndAnalyze() {
     const hotPosts = await hotRes.json();
     const newPosts = await newRes.json();
 
+    console.log('🔍 Hot response status:', hotRes.status);
+console.log('🔍 Hot response:', JSON.stringify(hotPosts).substring(0, 200));
+console.log('🔍 New response status:', newRes.status);
+console.log('🔍 Posts data structure:', {
+  hotIsArray: Array.isArray(hotPosts),
+  hotHasPosts: !!hotPosts?.posts,
+  hotLength: Array.isArray(hotPosts) ? hotPosts.length : hotPosts?.posts?.length || 0
+});
+
     console.log('🔍 Hot posts response:', { 
       isArray: Array.isArray(hotPosts),
       type: typeof hotPosts,
