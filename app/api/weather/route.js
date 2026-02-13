@@ -1,6 +1,9 @@
 import { Redis } from '@upstash/redis';
 
-const redis = Redis.fromEnv();
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -86,7 +89,17 @@ async function fetchAndAnalyze() {
     const newPosts = await newRes.json();
 
     // Combine and deduplicate
-    const allPosts = [...(hotPosts.posts || hotPosts || []), ...(newPosts.posts || newPosts || [])];
+    const allPosts = [
+      ...(Array.isArray(hotPosts) ? hotPosts : hotPosts?.posts || hotPosts?.data || []),
+      ...(Array.isArray(newPosts) ? newPosts : newPosts?.posts || newPosts?.data || [])
+    ];
+    
+    console.log('🔍 API Response structure:', { 
+      hotType: Array.isArray(hotPosts) ? 'array' : typeof hotPosts,
+      newType: Array.isArray(newPosts) ? 'array' : typeof newPosts,
+      hotKeys: hotPosts ? Object.keys(hotPosts) : 'null',
+      newKeys: newPosts ? Object.keys(newPosts) : 'null'
+    });
 
     console.log('📊 Total posts fetched:', allPosts.length);
 
