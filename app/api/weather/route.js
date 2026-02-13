@@ -1,41 +1,9 @@
-import { Redis } from '@upstash/redis';
-
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
-
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-
 export async function GET() {
   try {
-    // Check if cached data exists and is fresh
-    const cachedData = await getCachedData();
-    
-    if (cachedData && isFresh(cachedData.timestamp)) {
-      // Return cached data (no API call!)
-      return Response.json(cachedData.weather);
-    }
-    
-    // Cache is stale or doesn't exist - fetch new data
     const freshWeather = await fetchAndAnalyze();
-    
-    // Save to cache
-    await saveCacheData({
-      weather: freshWeather,
-      timestamp: Date.now()
-    });
-    
     return Response.json(freshWeather);
-    
   } catch (error) {
     console.error('Error:', error);
-    
-    // If error, try returning stale cache as fallback
-    const cachedData = await getCachedData();
-    if (cachedData) {
-      return Response.json(cachedData.weather);
-    }
     
     return Response.json({ 
       error: 'Failed to fetch weather',
@@ -47,28 +15,6 @@ export async function GET() {
       updatedAt: new Date().toISOString()
     }, { status: 500 });
   }
-}
-
-async function getCachedData() {
-  try {
-    const data = await redis.get('weather-data');
-    return data;
-  } catch (error) {
-    console.error('Redis get error:', error);
-    return null;
-  }
-}
-
-async function saveCacheData(data) {
-  try {
-    await redis.set('weather-data', data);
-  } catch (error) {
-    console.error('Redis set error:', error);
-  }
-}
-
-function isFresh(timestamp) {
-  return Date.now() - timestamp < CACHE_DURATION;
 }
 
 async function fetchAndAnalyze() {
@@ -88,18 +34,17 @@ async function fetchAndAnalyze() {
     const hotPosts = await hotRes.json();
     const newPosts = await newRes.json();
 
-    // Combine and deduplicate
+    console.log('🔍 Hot posts response:', { 
+      isArray: Array.isArray(hotPosts),
+      type: typeof hotPosts,
+      keys: hotPosts ? Object.keys(hotPosts).slice(0, 5) : null
+    });
+
+    // Handle different API response formats
     const allPosts = [
       ...(Array.isArray(hotPosts) ? hotPosts : hotPosts?.posts || hotPosts?.data || []),
       ...(Array.isArray(newPosts) ? newPosts : newPosts?.posts || newPosts?.data || [])
     ];
-    
-    console.log('🔍 API Response structure:', { 
-      hotType: Array.isArray(hotPosts) ? 'array' : typeof hotPosts,
-      newType: Array.isArray(newPosts) ? 'array' : typeof newPosts,
-      hotKeys: hotPosts ? Object.keys(hotPosts) : 'null',
-      newKeys: newPosts ? Object.keys(newPosts) : 'null'
-    });
 
     console.log('📊 Total posts fetched:', allPosts.length);
 
